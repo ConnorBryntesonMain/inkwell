@@ -19,3 +19,12 @@ Errors:
 ## GET /api/posts?page=n
 
 Success: 200 { posts: PostPublic[], page: number, hasMore: boolean }
+
+## POST /api/posts/:id/comments
+
+Request: { body: string}
+Success: 200 { body: string, publishedAT: DateTime}
+
+Errors:
+
+401 INVALID_BODY - "Empty Body or Use of Invaild Language"
