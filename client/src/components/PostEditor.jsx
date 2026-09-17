@@ -82,13 +82,13 @@ export function PostEditor() {
         </p>
       )}
 
-      <button
+           <button
         type="submit"
         disabled={status === STATES.PUBLISHING}
-        className="rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
+        className="w-full md:w-auto min-h-[44px] rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
       >
         {status === STATES.PUBLISHING ? "Publishing…" : "Publish"}
-      </button>
-    </form>
+      	</button>    
+	</form>
   );
 }
