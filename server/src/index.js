@@ -10,6 +10,7 @@ import healthRoutes from "./routes/health.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import postRoutes from "./routes/post.routes.js";
 import "./events/listeners/log-published-posts.listener.js";
+import statsRouter from "./routes/stats.js";
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -17,6 +18,7 @@ app.use(express.json());
 app.use("/api", healthRoutes);
 app.use("/api", authRoutes);
 app.use("/api", postRoutes);
+app.use("/api/stats", statsRouter);
 
 app.use((err, req, res, next) => {
 	console.error(err);

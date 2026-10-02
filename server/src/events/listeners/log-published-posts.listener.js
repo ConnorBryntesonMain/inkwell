@@ -7,6 +7,15 @@
 
 import { EventBus } from "../event-bus.js";
 
+let pubCount = 0;
+
 EventBus.on("post.published", (payload) => {
+  pubCount += 1;
   console.log(`[event] post.published:`, payload);
 });
+
+export function getStatus(){
+  return {
+    postsPublished: pubCount,
+  };
+}
