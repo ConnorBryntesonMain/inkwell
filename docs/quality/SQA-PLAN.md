@@ -27,7 +27,7 @@
 
 - Commits: 17
 - Logged defects: 1
-- Backlog items at "Requirements Defined" or later: <number from command 3>
+- Backlog items at "Requirements Defined" or later: 4
 
 ## Ownership
 - For this course project: the student/team implementing Inkwell owns SQA plan adherence.
