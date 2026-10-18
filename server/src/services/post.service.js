@@ -1,7 +1,7 @@
 // server/src/services/post.service.js
 
 import { PostRepository } from "../repositories/post.repository.js";
-import { assertNonEmpty } from "../utils/validation.js";
+import { assertNonEmpty, ValidationError } from "../utils/validation.js";
 import { SubstringSearchStrategy } from "./search/substring-search.strategy.js";
 import { EventBus } from "../events/event-bus.js";
 
@@ -40,6 +40,12 @@ export const PostService = {
   },
 
   async search({ query, page = 1, pageSize = 10 }) {
+    if (!Number.isInteger(page) || page < 1) {
+      throw new ValidationError("page must be a positive integer.", "INVALID_PAGE");
+    }
+    if (!Number.isInteger(pageSize) || pageSize < 1) {
+      throw new ValidationError("pageSize must be a positive integer.", "INVALID_PAGE_SIZE");
+    }
     return searchStrategy.search(query, { page, pageSize });
   },
 };
