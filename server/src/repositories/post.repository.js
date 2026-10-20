@@ -8,7 +8,23 @@ export const PostRepository = {
       data: { authorId, title, body, status, publishedAt },
     });
   },
-
+  createWithTags({ authorId, title, body, status, publishedAt, tagNames }) {
+    return prisma.post.create({
+      data: {
+        authorId,
+        title,
+        body,
+        status,
+        publishedAt,
+        tags: {
+          create: tagNames.map((name) => ({
+            tag: { connectOrCreate: { where: { name }, create: { name } } },
+          })),
+        },
+      },
+      include: { tags: { include: { tag: true } } },
+    });
+  },
   async findPublished({ page, pageSize }) {
     const rows = await prisma.post.findMany({
       where: { status: "PUBLISHED" },
