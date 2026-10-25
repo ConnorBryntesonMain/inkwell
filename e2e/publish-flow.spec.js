@@ -14,7 +14,9 @@ import { test, expect, devices } from "@playwright/test";
 
 const viewports = [
   { name: "mobile", viewport: devices["iPhone 13"].viewport },
+  { name: "tablet", viewport: devices["iPad Pro 11"].viewport },
   { name: "desktop", viewport: { width: 1280, height: 800 } },
+
 ];
 
 for (const viewport of viewports) {
