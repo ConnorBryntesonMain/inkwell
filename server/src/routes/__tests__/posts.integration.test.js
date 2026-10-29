@@ -58,3 +58,18 @@ test("registering with a duplicate email fails end to end (US-01 extension 3a, v
   expect(secondAttempt.status).toBe(400);
   expect(secondAttempt.body.error.code).toBe("EMAIL_ALREADY_REGISTERED");
 });
+
+
+test("an oversized pageSize is clamped, not served in full (DoS mitigation)", async () => {
+  const res = await request(app).get("/api/posts?page=1&pageSize=1000000");
+
+  expect(res.status).toBe(200);
+  expect(res.body.pageSize).toBe(50);
+});
+
+test("an invalid pageSize is rejected with 400, not a 500", async () => {
+  const res = await request(app).get("/api/posts?page=1&pageSize=-5");
+
+  expect(res.status).toBe(400);
+  expect(res.body.error.code).toBe("INVALID_PAGE_SIZE");
+});

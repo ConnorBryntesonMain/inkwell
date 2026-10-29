@@ -2,6 +2,7 @@
 
 import { Router } from "express";
 import { PostService } from "../services/post.service.js";
+import { ValidationError } from "../utils/validation.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -28,12 +29,19 @@ router.post("/posts", requireAuth, async (req, res) => {
 
 router.get("/posts", async (req, res, next) => {
   try {
-    const { page = 1, search } = req.query;
+    const { page = "1", pageSize = "10", search } = req.query;
+    // Lecture 15, Exercise 1: pageSize is now read from the query string;
+    // PostService clamps it to MAX_PAGE_SIZE.
+    const pagination = { page: Number(page), pageSize: Number(pageSize) };
     const result = search
-      ? await PostService.search({ query: search, page: Number(page) })
-      : await PostService.listPublished({ page: Number(page) });
+      ? await PostService.search({ query: search, ...pagination })
+      : await PostService.listPublished(pagination);
     res.status(200).json(result);
   } catch (err) {
+    // Bad page/pageSize input is a client error (400), not a server error (500).
+    if (err instanceof ValidationError) {
+      return res.status(400).json({ error: { code: err.code, message: err.message } });
+    }
     next(err);
   }
 });
