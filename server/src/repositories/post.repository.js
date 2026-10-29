@@ -1,6 +1,7 @@
 // server/src/repositories/post.repository.js
 
 import { prisma } from "../db/client.js";
+import { toPublicUser } from "../dto/user.dto.js";
 
 export const PostRepository = {
   create({ authorId, title, body, status, publishedAt }) {
@@ -8,6 +9,7 @@ export const PostRepository = {
       data: { authorId, title, body, status, publishedAt },
     });
   },
+
   createWithTags({ authorId, title, body, status, publishedAt, tagNames }) {
     return prisma.post.create({
       data: {
@@ -25,15 +27,22 @@ export const PostRepository = {
       include: { tags: { include: { tag: true } } },
     });
   },
+
+  // Lecture 15: author included, then shaped through toPublicUser so
+  // email and passwordHash never reach the feed response.
   async findPublished({ page, pageSize }) {
     const rows = await prisma.post.findMany({
       where: { status: "PUBLISHED" },
+      include: { author: true },
       orderBy: { publishedAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize + 1, // fetch one extra row to compute hasMore
     });
     const hasMore = rows.length > pageSize;
-    return { posts: rows.slice(0, pageSize), hasMore };
+    return {
+      posts: rows.slice(0, pageSize).map((post) => ({ ...post, author: toPublicUser(post.author) })),
+      hasMore,
+    };
   },
 
   async searchPublished({ query, page, pageSize }) {
@@ -46,11 +55,15 @@ export const PostRepository = {
     };
     const rows = await prisma.post.findMany({
       where,
+      include: { author: true },
       orderBy: { publishedAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize + 1,
     });
     const hasMore = rows.length > pageSize;
-    return { posts: rows.slice(0, pageSize), hasMore };
+    return {
+      posts: rows.slice(0, pageSize).map((post) => ({ ...post, author: toPublicUser(post.author) })),
+      hasMore,
+    };
   },
 };

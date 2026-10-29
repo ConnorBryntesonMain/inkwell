@@ -1,12 +1,23 @@
+// server/src/routes/post.routes.js
+
 import { Router } from "express";
 import { PostService } from "../services/post.service.js";
+import { requireAuth } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-router.post("/posts", async (req, res) => {
+// Lecture 15 (hardened): requireAuth verifies the JWT, and authorId
+// comes from req.user, never from the request body.
+router.post("/posts", requireAuth, async (req, res) => {
   try {
-    const { authorId, title, body } = req.body;
-    const post = await PostService.publish({ authorId, title, body });
+    const { title, body } = req.body;
+    // Never trust client-supplied identity fields — derive
+    // authorId from the authenticated request, not the request body.
+    const post = await PostService.publish({
+      title,
+      body,
+      authorId: req.user.id, // set by requireAuth middleware from the verified JWT
+    });
     res.status(201).json(post);
   } catch (err) {
     res.status(400).json({
@@ -28,5 +39,3 @@ router.get("/posts", async (req, res, next) => {
 });
 
 export default router;
-
-
