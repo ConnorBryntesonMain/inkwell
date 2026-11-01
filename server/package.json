@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch --env-file=.env src/index.js",
-    "test": "node --experimental-vm-modules --env-file=.env.test node_modules/jest/bin/jest.js --runInBand"
+    "test": "node --experimental-vm-modules --env-file=.env.test node_modules/.bin/jest --runInBand"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
@@ -16,6 +16,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.2",
     "jsonwebtoken": "^9.0.3",
+    "pino": "^10.4.0",
     "prisma": "^7.10.0",
     "supertest": "^7.3.1"
   },

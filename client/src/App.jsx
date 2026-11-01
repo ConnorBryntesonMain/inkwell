@@ -4,6 +4,7 @@
 // This file's only job is routing + layout — no business logic here,
 // the same "thin top layer" discipline we applied to server/src/index.js
 // in Lecture 5.
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { NavBar } from "./components/NavBar";
 import { Feed } from "./components/Feed";

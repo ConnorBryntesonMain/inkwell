@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { PostCard } from "./PostCard";
 
 export function Feed() {
-  const [posts, setPosts] = useState(null); // null = loading (Section 4.6: visibility of system status)
+  const [posts, setPosts] = useState(null);
 
   useEffect(() => {
     fetch("/api/posts?page=1")
@@ -12,25 +12,26 @@ export function Feed() {
       .then((data) => setPosts(data.posts));
   }, []);
 
-  if (posts === null) {
-    return <p className="text-gray-500">Loading posts…</p>;
-  }
-
-  if (posts.length === 0) {
-    // Lecture 3, Browse Feed extension 2a: an explicit empty state, not a blank screen.
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">No posts yet.</p>
-        <Link to="/write" className="text-indigo-600 underline">Write the first one</Link>
-      </div>
-    );
-  }
-
   return (
-    <ul className="space-y-6">
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
-    </ul>
+    <div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Feed</h1>
+
+      {posts === null && <p className="text-gray-500">Loading posts…</p>}
+
+      {posts !== null && posts.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-500">No posts yet.</p>
+          <Link to="/write" className="text-indigo-600 underline">Write the first one</Link>
+        </div>
+      )}
+
+      {posts !== null && posts.length > 0 && (
+        <ul className="space-y-6">
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

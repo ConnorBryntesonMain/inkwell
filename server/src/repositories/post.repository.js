@@ -66,4 +66,11 @@ export const PostRepository = {
       hasMore,
     };
   },
+  findById(id) {
+    return prisma.post.findUnique({ where: { id } });
+  },
+ 
+  deleteById(id) {
+    return prisma.post.delete({ where: { id } });
+  },
 };

@@ -57,4 +57,12 @@ export const PostService = {
     const safe = normalizePagination(page, pageSize);
     return searchStrategy.search(query, safe);
   },
+  async getById(id) {
+    return PostRepository.findById(id);
+  },
+
+  async delete(id) {
+    return PostRepository.deleteById(id);
+  },
+
 };
