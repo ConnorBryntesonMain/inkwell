@@ -1,0 +1,59 @@
+# docker-compose.yml
+#
+# Define the server, database, network connection, and persistent storage
+# in one reviewable, version-controlled file. This applies software
+# configuration management practices to the local infrastructure.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: inkwell
+      POSTGRES_PASSWORD: inkwell
+      POSTGRES_DB: inkwell_dev
+    ports:
+      - "5433:5432"
+      # Use host port 5433 because another local PostgreSQL server may
+      # already use port 5432.
+      #
+      # The server service does not use this host mapping. It connects to
+      # db:5432 through Docker's internal network. The mapping lets tools
+      # on the host inspect the database, for example:
+      #   psql -h localhost -p 5433
+    volumes:
+      - inkwell_db_data:/var/lib/postgresql/data
+      # Store PostgreSQL data in a named volume so it survives when Docker
+      # stops or recreates the database container.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inkwell -d inkwell_dev"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  server:
+    build: ./server
+    environment:
+      DATABASE_URL: postgresql://inkwell:inkwell@db:5432/inkwell_dev
+      # "db" is the service name above, not an IP address. Docker Compose
+      # resolves the name through its internal network.
+      #
+      # server/.env does not enter the image because .dockerignore excludes
+      # it. The container must receive the token secrets at runtime.
+      #
+      # Do not write the secrets directly in this committed file. Compose
+      # reads them from the root .env file. The :? syntax stops startup
+      # when a value is missing.
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?set ACCESS_TOKEN_SECRET in .env}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?set REFRESH_TOKEN_SECRET in .env}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+        # A short depends_on list waits only for the database container to
+        # start. It does not wait for PostgreSQL to accept connections.
+        # This condition waits for the health check. The entrypoint retry
+        # loop provides another layer of protection.
+
+volumes:
+  inkwell_db_data:
