@@ -7,6 +7,9 @@ import rateLimit from "express-rate-limit";
 export const authRateLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 5,
+  // CI only: the e2e-tests job sets DISABLE_RATE_LIMIT=true. Nothing
+  // else sets it, so the limiter stays on in production.
+  skip: () => process.env.DISABLE_RATE_LIMIT === "true",
   message: { error: { code: "TOO_MANY_ATTEMPTS", message: "Too many attempts. Try again later." } },
   standardHeaders: true,
   legacyHeaders: false,
