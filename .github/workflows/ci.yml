@@ -84,6 +84,12 @@ jobs:
         working-directory: server               # server with a database
         run: npx prisma migrate deploy
 
+      # FIX: "npm test" loads .env.test (--env-file=.env.test), which is
+      # never committed. Node exits before Jest runs if the file is missing.
+      - name: Write a throwaway .env.test
+        working-directory: server
+        run: printf 'DATABASE_URL=%s\n' "$DATABASE_URL" > .env.test
+
       - name: Run tests with coverage           # Section 4.3, step "test"
         working-directory: server               # Lecture 12 unit + Lecture 13 integration
         run: npm test -- --coverage
@@ -135,6 +141,10 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://inkwell:inkwell@localhost:5432/inkwell_test
+      # FIX: 3 viewports x (register + login) = 6 auth requests, which is
+      # more than the limiter's 5 per 10 minutes. The server that
+      # Playwright starts reads this variable and skips the limiter.
+      DISABLE_RATE_LIMIT: "true"
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -147,7 +157,7 @@ jobs:
             client/package-lock.json
 
       - name: Install dependencies (Playwright, server, client)
-        # playwright.config.js starts the real server and client with
+        # playwright.config.ts starts the real server and client with
         # "npm run dev", so both need their own dependencies installed.
         run: |
           npm ci
@@ -169,9 +179,7 @@ jobs:
 
       - name: Run end-to-end tests              # Lecture 14's E2E + accessibility suites
         run: npx playwright test --project=chromium
-        # Chromium only on every pull request: fast, and it keeps the
-        # publish-flow test's sign-ups under the server's auth rate limit
-        # (5 requests per 10 minutes per IP, Lecture 15). Firefox and
+        # Chromium only on every pull request: fast. Firefox and
         # WebKit belong in a scheduled run (Section 4.2).
 
       - name: Upload the Playwright report
@@ -209,7 +217,7 @@ jobs:
           docker push "$IMAGE"
         # ${VAR,,} lowercases the owner name: image names must be
         # lowercase, but GitHub usernames may not be.
-
+        #
         # This is the exact, unmodified image Lecture 21's CD workflow
         # will later retrieve and deploy — pushed once, by tag, never
         # rebuilt again downstream.
