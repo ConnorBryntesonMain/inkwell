@@ -28,19 +28,13 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v5
-        # Section 4.2: a reusable ACTION, not a raw shell command —
-        # this one is maintained by GitHub itself and handles the
-        # (surprisingly fiddly) details of cloning the right commit.
-        # "@v5" pins the major version. v4 still works, but it targets
-        # Node.js 20, which GitHub has deprecated on its runners, so every
-        # run would carry a deprecation warning.
 
       - name: Build the server Docker image
+        run: docker build -t inkwell-server:ci ./server
+
+      - name: Confirm the image was built
         run: docker image inspect inkwell-server:ci --format 'Built {{.Id}} ({{.Architecture}}, {{.Size}} bytes)'
         # "docker image inspect" exits with an error if the image does not
         # exist, so this step genuinely fails when there is no image.
         # ("docker images" would not: it prints an empty table and still
         # reports success, so a check built on it could never fail.)
-
-      - name: Confirm the image was built
-        run: docker images inkwell-server:ci
