@@ -1,18 +1,215 @@
 # .github/workflows/ci.yml
+#
+# Section 4.3's generic steps, applied in full: checkout, set up
+# environment, install dependencies, build, test, report — for every
+# layer of Inkwell's testing pyramid (Lectures 12-14).
+
 name: CI
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
-  pull_request:
+  # Section 4.2: this is PER-PULL-REQUEST CI (gating the merge
+  # decision, per Lecture 17's GitHub Flow) plus a push-to-main
+  # safety check.
+
+permissions:
+  contents: read
+  # Lecture 19, Section 4.2: every job may read the code and nothing
+  # more, unless a job asks for more itself (see the last job).
 
 jobs:
   dependency-audit:
+    # the security check that already guards main. Now covers the client
+    # too (Section 5.1b, Step 2).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 22
-      - run: npm audit --audit-level=high
+          node-version: "22"
+      - name: Audit server dependencies
+        run: npm audit --audit-level=high
         working-directory: server
+      - name: Audit client dependencies
+        run: npm audit --audit-level=high
+        working-directory: client
+
+  server-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: inkwell
+          POSTGRES_PASSWORD: inkwell
+          POSTGRES_DB: inkwell_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://inkwell:inkwell@localhost:5432/inkwell_test
+      # Set once for the whole job. Every Prisma command (generate
+      # included) loads prisma.config.ts, which refuses to run without
+      # DATABASE_URL, and the tests need it to reach the database above.
+
+    steps:
+      - name: Checkout                          # Section 4.3, step 1
+        uses: actions/checkout@v5
+
+      - name: Set up environment                # Section 4.3, step 2
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"                    # matches server/package.json engines (Lecture 10)
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies              # Section 4.3, step 3
+        working-directory: server
+        run: npm ci
+
+      - name: Generate Prisma client
+        # `npm ci` does not generate the Prisma client; without this
+        # step every test that touches the database fails with
+        # "Cannot find module '.prisma/client/default'".
+        working-directory: server
+        run: npx prisma generate
+
+      - name: Apply database migrations         # part of "build" for a
+        working-directory: server               # server with a database
+        run: npx prisma migrate deploy
+
+      - name: Run tests with coverage           # Section 4.3, step "test"
+        working-directory: server               # Lecture 12 unit + Lecture 13 integration
+        run: npm test -- --coverage
+        # "npm test" keeps the --experimental-vm-modules flag this
+        # project's ES modules need; everything after "--" is passed
+        # on to Jest. Plain "npx jest" would skip that flag and fail.
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-report
+          path: server/coverage/
+
+  client-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+      - working-directory: client
+        run: npm ci
+      - working-directory: client
+        run: npx vitest run     # Lecture 13's React Testing Library suite
+      - working-directory: client
+        run: npm run build      # Section 4.3, step 4: the production bundle still builds
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: [server-tests, client-tests]
+    # Section 4.1's "cheap when caught early" principle, encoded
+    # directly: the slowest test layer only runs after the fast
+    # layers have already passed, so an obviously broken change
+    # fails fast without waiting for the full E2E suite.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: inkwell
+          POSTGRES_PASSWORD: inkwell
+          POSTGRES_DB: inkwell_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://inkwell:inkwell@localhost:5432/inkwell_test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Install dependencies (Playwright, server, client)
+        # playwright.config.js starts the real server and client with
+        # "npm run dev", so both need their own dependencies installed.
+        run: |
+          npm ci
+          npm ci --prefix server
+          npm ci --prefix client
+
+      - name: Prepare the server and its database
+        working-directory: server
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          printf 'DATABASE_URL=%s\n' "$DATABASE_URL" > .env
+        # The server's "dev" script loads .env (--env-file=.env), which
+        # is never committed. CI writes a throwaway one holding only the
+        # test database's URL.
+
+      - name: Install the Chromium browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run end-to-end tests              # Lecture 14's E2E + accessibility suites
+        run: npx playwright test --project=chromium
+        # Chromium only on every pull request: fast, and it keeps the
+        # publish-flow test's sign-ups under the server's auth rate limit
+        # (5 requests per 10 minutes per IP, Lecture 15). Firefox and
+        # WebKit belong in a scheduled run (Section 4.2).
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+  prepare-deployment-artifact:
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, server-tests, client-tests, e2e-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Section 4.4: "preparing for deployment" — build and tag the
+    # image, but do NOT deploy it. Deployment itself is Lecture 21's
+    # separate concern (Continuous Delivery).
+    permissions:
+      contents: read    # checkout still needs to read the code
+      packages: write   # push to GitHub Container Registry (GHCR)
+    steps:
+      - uses: actions/checkout@v5
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        # GITHUB_TOKEN is automatically provided by Actions — no manual
+        # credential setup needed to push to your own account's registry.
+
+      - name: Build, tag and push the image to GHCR
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/inkwell-server:${GITHUB_SHA}"
+          docker build -t "$IMAGE" ./server
+          docker push "$IMAGE"
+        # ${VAR,,} lowercases the owner name: image names must be
+        # lowercase, but GitHub usernames may not be.
+
+        # This is the exact, unmodified image Lecture 21's CD workflow
+        # will later retrieve and deploy — pushed once, by tag, never
+        # rebuilt again downstream.
